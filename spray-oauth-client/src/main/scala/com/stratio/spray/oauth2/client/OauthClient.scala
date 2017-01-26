@@ -15,17 +15,29 @@
  */
 package com.stratio.spray.oauth2.client
 
-import spray.client.pipelining._
-import spray.http.{HttpResponse, HttpRequest, HttpCookie}
-import spray.http.StatusCodes._
-import spray.routing._
+import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.model.Uri
+import akka.http.scaladsl.model.headers.HttpCookie
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.HttpMethods._
+import akka.http.scaladsl.server.Directive1
+import akka.http.scaladsl.server.directives.ParameterDirectives.ParamMagnet
 
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future, ExecutionContext}
+import scala.concurrent.{Await, ExecutionContext}
+import akka.http.scaladsl.server.Directives
+import akka.stream.ActorMaterializer
+
 import SessionStore._
-trait OauthClient extends HttpService   {
+trait OauthClient extends Directives  {
 
   implicit val ec: ExecutionContext = ExecutionContext.global
+
+  implicit val system: ActorSystem
+  implicit val materializer: ActorMaterializer
 
   val configure = new Config
 
@@ -41,7 +53,7 @@ trait OauthClient extends HttpService   {
     if (configure.Enabled) {
       optionalCookie(configure.CookieName) flatMap {
         case Some(x) => {
-          getSession(x.content) match {
+          getSession(x.value) match {
             case Some(cont: String) => provide(cont)
             case None => complete(Unauthorized,"")
           }
@@ -60,7 +72,7 @@ trait OauthClient extends HttpService   {
     if (configure.Enabled) {
       optionalCookie(configure.CookieName) flatMap {
         case Some(x) => {
-          getSession(x.content) match {
+          getSession(x.value) match {
             case Some(cont: String) => provide(cont)
             case None => authorizeRedirect
           }
@@ -74,8 +86,6 @@ trait OauthClient extends HttpService   {
       provide("*")
     }
   }
-
-
 
   val login = (path("login") & get) {
     parameter("code") { code: String =>
@@ -92,7 +102,7 @@ trait OauthClient extends HttpService   {
     get {
       optionalCookie(configure.CookieName) {
         case Some(x) => {
-          removeSession(x.content)
+          removeSession(x.value)
           deleteCookie(configure.CookieName, path = "/")
           logoutRedirect
         }
@@ -113,10 +123,15 @@ trait OauthClient extends HttpService   {
   }
 
   def makeGetRq(url: String): String = {
-    val pipeline: HttpRequest => Future[HttpResponse] = sendReceive
-    val response = pipeline(Get(url))
+    val request = HttpRequest(
+      method = GET,
+      uri = Uri(url)
+    )
+
+    val response = Http().singleRequest(request)
+
     val plainResponse: HttpResponse = Await.result(response, Duration.Inf)
-    plainResponse.entity.asString
+    plainResponse.entity.toString
   }
 
 

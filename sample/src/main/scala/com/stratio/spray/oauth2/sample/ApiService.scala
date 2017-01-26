@@ -15,16 +15,10 @@
  */
 package com.stratio.spray.oauth2.sample
 
-import akka.actor.{Props, ActorLogging}
+import akka.http.scaladsl.server.RouteConcatenation
 import com.stratio.spray.oauth2.client.{OauthClient, OauthClientHelper}
-import spray.routing.HttpServiceActor
 
-object ApiActor {
-
-  def props = Props[ApiActor]
-}
-
-class ApiActor extends HttpServiceActor with OauthClient with ActorLogging {
+trait ApiService extends RouteConcatenation with OauthClient {
 
   import OauthClientHelper._
 
@@ -64,9 +58,7 @@ class ApiActor extends HttpServiceActor with OauthClient with ActorLogging {
       }
     }
   }
-  val route = otherRoute ~ secRoute ~ myRoutes ~ authorizedRoute
-
-  override def receive: Receive = runRoute(route)
+  val routes = otherRoute ~ secRoute ~ myRoutes ~ authorizedRoute
 }
 
 

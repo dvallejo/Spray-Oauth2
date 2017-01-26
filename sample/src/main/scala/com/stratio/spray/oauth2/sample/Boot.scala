@@ -16,17 +16,13 @@
 package com.stratio.spray.oauth2.sample
 
 import akka.actor.ActorSystem
-import akka.io.IO
-import spray.can.Http
+import akka.http.scaladsl.Http
+import akka.stream.ActorMaterializer
 
-object Boot extends App{
+object Boot extends App with ApiService {
 
   implicit val system = ActorSystem("demo")
+  override implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  //	val settings = Settings(system)
-  val api = system.actorOf(ApiActor.props, "api-actor")
-
-  IO(Http) ! Http.Bind(listener = api,
-    interface = "0.0.0.0",
-    port = 9090)
+  Http().bindAndHandle(routes, "0.0.0.0", port = 9090)
 }
